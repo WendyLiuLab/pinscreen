@@ -202,7 +202,7 @@ def calculate_peak_strain(fit_parameters, resting_x, resting_y, extended_x, exte
     strain_x = []
     strain_y = []
 
-    # now, compute the discrete 
+    # now, compute the discrete derivative in each axis
     n = int(sqrt(n_dots))
     for di in xrange(n_dots):
         # in x
@@ -226,6 +226,7 @@ def write_plots(frames, fit_parameters, directory, dt=1/30.0):
     t = np.arange(len(frames)) * dt
     fit = lambda t, sf: sf.eval(t)
     
+    # plot the sine fits first
     for idot in xrange(len(frames[0])):
         actual_x = [frame[idot].xpos for frame in frames]
         actual_y = [frame[idot].ypos for frame in frames]
@@ -241,6 +242,39 @@ def write_plots(frames, fit_parameters, directory, dt=1/30.0):
         axes.text(0.95, 0.5, r"""x: $%.2f sin(\frac{2 \pi}{%.2f} t + %.2f) + %.2f$; $R^2=%.4f$
 y: $%.2f sin(\frac{2 \pi}{%.2f} t + %.2f) + %.2f$; $R^2=%.4f$""" % (fit_x.amplitude, fit_x.period, fit_x.phase, fit_x.offset, fit_x.r2, fit_y.amplitude, fit_y.period, fit_y.phase, fit_y.offset, fit_y.r2), verticalalignment='center', horizontalalignment='right', transform=axes.transAxes)
         plt.savefig('%s/dot_%04d_fit.png' % (directory, idot))
+    
+    # then adjust the coordinate system
+    center_by_frame = find_center_by_frame(frames)
+    center_x, center_y = center_by_frame[0]
+    centers_x, centers_y = zip(*center_by_frame)
+    # show displacement of center from center_x, _y
+    centers_x = [frame_pos - center_x for frame_pos in centers_x]
+    centers_y = [frame_pos - center_y for frame_pos in centers_y]
+    plt.clf()
+    plt.plot(t, centers_x, t, centers_y)
+    plt.legend(['X', 'Y'])
+    plt.xlabel('Time (s)')
+    plt.ylabel('Mean point displacement from center (px)')
+    plt.savefig('%s/center_displacement.png' % directory)
+    
+    # add dx, dy to each dot in each frame
+    for i, frame in enumerate(frames):
+        for dot in frame:
+            dot.xpos -= centers_x[i]
+            dot.ypos -= centers_y[i]
+    
+    # verify that the frame remains centered at (center_x, center_y) for all t now
+    center_by_frame = find_center_by_frame(frames)
+    centers_x, centers_y = zip(*center_by_frame)
+    # normalize this so we expect the center to be 0,0
+    centers_x = [frame_pos - center_x for frame_pos in centers_x]
+    centers_y = [frame_pos - center_y for frame_pos in centers_y]
+    plt.clf()
+    plt.plot(t, centers_x, t, centers_y)
+    plt.legend(['X', 'Y'])
+    plt.xlabel('Time (s)')
+    plt.ylabel('Mean point displacement from center (px)')
+    plt.savefig('%s/center_displacement_post.png' % directory)
 
     # plot the resting and extended coordinates
     (center_x, center_y, resting_x, resting_y, extended_x, extended_y) = process_coordinates(fit_parameters)
@@ -261,22 +295,11 @@ y: $%.2f sin(\frac{2 \pi}{%.2f} t + %.2f) + %.2f$; $R^2=%.4f$""" % (fit_x.amplit
         plt.colorbar()
         plt.savefig('%s/peakstrain_%s.png' % (directory, label))
 
-    center_by_frame = find_center_by_frame(frames)
-    centers_x, centers_y = zip(*center_by_frame)
-    # normalize this so we expect the center to be 0,0
-    centers_x = [frame_pos - center_x for frame_pos in centers_x]
-    centers_y = [frame_pos - center_y for frame_pos in centers_y]
-    plt.clf()
-    plt.plot(t, centers_x, t, centers_y)
-    plt.legend(['X', 'Y'])
-    plt.xlabel('Time (s)')
-    plt.ylabel('Mean point displacement from center (px)')
-    plt.savefig('%s/center_displacement.png' % directory)
-
     f = open('%s/index.html' % directory, 'w')
     print >> f, "<!DOCTYPE html>\n<html><head><title>Regression results</title></head><body>"
     print >> f, '<h1>Dot positions</h1><img src="coordinates.png" />'
-    print >> f, '<h1>Center displacement</h1><img src="center_displacement.png" />'
+    print >> f, '<h1>Center displacement (pre-correction)</h1><img src="center_displacement.png" />'
+    print >> f, '<h1>Center displacement (post-correction)</h1><img src="center_displacement_post.png" />'
     print >> f, '<h1>Peak strain: x</h1><img src="peakstrain_x.png" /><h1>Peak strain: y</h1><img src="peakstrain_y.png" />'
     for idot in xrange(len(frames[0])):
         print >> f, '<h1>Dot %d</h1><img src="dot_%04d_fit.png" />' % (idot, idot)
