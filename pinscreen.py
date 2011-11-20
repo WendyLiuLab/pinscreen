@@ -79,6 +79,46 @@ def parse_csv(fileobj):
     if not all([len(frame) == len(frames[0]) for frame in frames]): raise "Consistency error in input."
     return frames
 
+def parse_mtrack2(fileobj):
+    """frames = parse_mtrack2(fileobj)
+    Reads in output from ImageJ plugin MTrack2. Converts it into a list of
+    lists of Dot objects:
+    frames[0] = [Dot0, Dot1,...].
+    Reorganizes the dots so that 0, 1, 2, ... sqrt(n) is the top row from L to
+    R, thence onwards."""
+    headers = fileobj.readline()[:-1].split('\t')
+    n = (len(headers)-1)/3
+    if abs(sqrt(n) - int(sqrt(n))) > 0.01:
+        raise "Number of dots does not describe a square."
+    # x_col[1] is the index in line for X1
+    x_col, y_col = [1 + i*3 for i in xrange(n)], [2 + i*3 for i in xrange(n)]
+    assignments = None
+    fileobj.readline() # discard the line "Tracks 1 to n"
+    frames = []
+    for line in fileobj.readlines():
+        line = line[:-1].split('\t')
+        if not assignments:
+            x, y = [(i, line[col]) for i, col in enumerate(x_col)], [(i, line[col]) for i, col in enumerate(y_col)]
+            x = sorted(x, cmp=lambda a,b: cmp(a[1], b[1]))
+            y = sorted(y, cmp=lambda a,b: cmp(a[1], b[1]))
+            xi, yi = [None]*n, [None]*n
+            for sort_i, (file_i, value) in enumerate(x): #@UnusedVariable
+                xi[file_i] = sort_i
+            for sort_i, (file_i, value) in enumerate(y): #@UnusedVariable
+                yi[file_i] = sort_i
+            assignments = [None] * n
+            for i in xrange(n):
+                row = int(floor(yi[i] / int(sqrt(n))))
+                col = int(floor(xi[i] / int(sqrt(n))))
+                assignments[i] = row*int(sqrt(n)) + col
+        frame = [None]*n
+        for i in xrange(n):
+            frame[assignments[i]] = Dot(float(line[x_col[i]]), float(line[y_col[i]]), 1)
+        frames.append(frame)
+    print [i for i in enumerate(assignments)]
+    return frames
+            
+
 def sinefit(frames, dt = 1.0/30.0):
     """fit_parameters = sinefit(frames)
     Takes the output of parse_csv and runs a sine-fitting function against it.
@@ -99,12 +139,12 @@ def sinefit(frames, dt = 1.0/30.0):
         # FIXME: "success" here is not a valid success measure
         px, success = optimize.leastsq(errfunc, p0, args=(t, dx))
         if not success:
-           raise "Problem with optimize for dot %d in x" % idot
+            raise "Problem with optimize for dot %d in x" % idot
         xfit = SineFit(*px)
         xfit.r2 = stats.mstats.pearsonr(dx, xfit.eval(t))[0] ** 2
         py, success = optimize.leastsq(errfunc, p0, args=(t, dy))
         if not success:
-           raise "Problem with optimize for dot %d in y" % idot
+            raise "Problem with optimize for dot %d in y" % idot
         yfit = SineFit(*py)
         yfit.r2 = stats.mstats.pearsonr(dy, yfit.eval(t))[0] ** 2
         fit_parameters.append( (xfit, yfit) )
@@ -205,7 +245,7 @@ y: $%.2f sin(\frac{2 \pi}{%.2f} t + %.2f) + %.2f$; $R^2=%.4f$""" % (fit_x.amplit
     # plot the resting and extended coordinates
     (center_x, center_y, resting_x, resting_y, extended_x, extended_y) = process_coordinates(fit_parameters)
     plt.clf()
-    plt.axis([0,50,50,0])
+    plt.axis([0,100,100,0])
     plt.scatter(resting_x, resting_y, c='b')
     plt.scatter(extended_x, extended_y, c='r')
     plt.savefig('%s/coordinates.png' % directory)
@@ -251,11 +291,12 @@ def main(argv):
         sys.exit(1)
     os.mkdir(argv[2]) # do this first so we aren't surprised later
     f = open(sys.argv[1], 'rU')
-    frames = parse_csv(f)
+    #frames = parse_csv(f)
+    frames = parse_mtrack2(f)
     f.close()
     fit_parameters = sinefit(frames)
-    frames = censor_outliers(frames, fit_parameters)
-    fit_parameters = sinefit(frames)
+#    frames = censor_outliers(frames, fit_parameters)
+#    fit_parameters = sinefit(frames)
     write_plots(frames, fit_parameters, sys.argv[2])
 
 if __name__ == '__main__':
