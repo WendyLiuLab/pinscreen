@@ -196,6 +196,20 @@ def process_coordinates(fit_parameters):
 def find_center_by_frame(frames):
     return [(np.mean([dot.xpos for dot in frame]), np.mean([dot.ypos for dot in frame])) for frame in frames]
 
+def recenter(frames):
+    center_by_frame = find_center_by_frame(frames)
+    center_x, center_y = center_by_frame[0]
+    centers_x, centers_y = zip(*center_by_frame)
+    # show displacement of center from center_x, _y
+    centers_x = [frame_pos - center_x for frame_pos in centers_x]
+    centers_y = [frame_pos - center_y for frame_pos in centers_y]
+    # add dx, dy to each dot in each frame
+    for i, frame in enumerate(frames):
+        for dot in frame:
+            dot.xpos -= centers_x[i]
+            dot.ypos -= centers_y[i]
+    return frames
+
 def calculate_peak_strain(fit_parameters, resting_x, resting_y, extended_x, extended_y):
     # calculate strain at peak extension
     n_dots = len(fit_parameters)
@@ -243,45 +257,15 @@ def write_plots(frames, fit_parameters, directory, dt=1/30.0):
 y: $%.2f sin(\frac{2 \pi}{%.2f} t + %.2f) + %.2f$; $R^2=%.4f$""" % (fit_x.amplitude, fit_x.period, fit_x.phase, fit_x.offset, fit_x.r2, fit_y.amplitude, fit_y.period, fit_y.phase, fit_y.offset, fit_y.r2), verticalalignment='center', horizontalalignment='right', transform=axes.transAxes)
         plt.savefig('%s/dot_%04d_fit.png' % (directory, idot))
     
-    # then adjust the coordinate system
-    center_by_frame = find_center_by_frame(frames)
-    center_x, center_y = center_by_frame[0]
-    centers_x, centers_y = zip(*center_by_frame)
-    # show displacement of center from center_x, _y
-    centers_x = [frame_pos - center_x for frame_pos in centers_x]
-    centers_y = [frame_pos - center_y for frame_pos in centers_y]
-    plt.clf()
-    plt.plot(t, centers_x, t, centers_y)
-    plt.legend(['X', 'Y'])
-    plt.xlabel('Time (s)')
-    plt.ylabel('Mean point displacement from center (px)')
-    plt.savefig('%s/center_displacement.png' % directory)
-    
-    # add dx, dy to each dot in each frame
-    for i, frame in enumerate(frames):
-        for dot in frame:
-            dot.xpos -= centers_x[i]
-            dot.ypos -= centers_y[i]
-    
-    # verify that the frame remains centered at (center_x, center_y) for all t now
-    center_by_frame = find_center_by_frame(frames)
-    centers_x, centers_y = zip(*center_by_frame)
-    # normalize this so we expect the center to be 0,0
-    centers_x = [frame_pos - center_x for frame_pos in centers_x]
-    centers_y = [frame_pos - center_y for frame_pos in centers_y]
-    plt.clf()
-    plt.plot(t, centers_x, t, centers_y)
-    plt.legend(['X', 'Y'])
-    plt.xlabel('Time (s)')
-    plt.ylabel('Mean point displacement from center (px)')
-    plt.savefig('%s/center_displacement_post.png' % directory)
-
     # plot the resting and extended coordinates
     (center_x, center_y, resting_x, resting_y, extended_x, extended_y) = process_coordinates(fit_parameters)
     plt.clf()
     plt.axis([0,100,100,0])
-    plt.scatter(resting_x, resting_y, c='b')
-    plt.scatter(extended_x, extended_y, c='r')
+    plt.quiver(resting_x, resting_y,
+               [extended_x[i]-resting_x[i] for i in xrange(len(resting_x))],
+               [extended_y[i]-resting_y[i] for i in xrange(len(resting_y))])
+    #plt.scatter(resting_x, resting_y, c='b')
+    #plt.scatter(extended_x, extended_y, c='r')
     plt.savefig('%s/coordinates.png' % directory)
 
     n = int(sqrt(len(fit_parameters)))
@@ -298,8 +282,8 @@ y: $%.2f sin(\frac{2 \pi}{%.2f} t + %.2f) + %.2f$; $R^2=%.4f$""" % (fit_x.amplit
     f = open('%s/index.html' % directory, 'w')
     print >> f, "<!DOCTYPE html>\n<html><head><title>Regression results</title></head><body>"
     print >> f, '<h1>Dot positions</h1><img src="coordinates.png" />'
-    print >> f, '<h1>Center displacement (pre-correction)</h1><img src="center_displacement.png" />'
-    print >> f, '<h1>Center displacement (post-correction)</h1><img src="center_displacement_post.png" />'
+#    print >> f, '<h1>Center displacement (pre-correction)</h1><img src="center_displacement.png" />'
+#    print >> f, '<h1>Center displacement (post-correction)</h1><img src="center_displacement_post.png" />'
     print >> f, '<h1>Peak strain: x</h1><img src="peakstrain_x.png" /><h1>Peak strain: y</h1><img src="peakstrain_y.png" />'
     for idot in xrange(len(frames[0])):
         print >> f, '<h1>Dot %d</h1><img src="dot_%04d_fit.png" />' % (idot, idot)
@@ -317,6 +301,7 @@ def main(argv):
     #frames = parse_csv(f)
     frames = parse_mtrack2(f)
     f.close()
+    frames = recenter(frames)
     fit_parameters = sinefit(frames)
 #    frames = censor_outliers(frames, fit_parameters)
 #    fit_parameters = sinefit(frames)
