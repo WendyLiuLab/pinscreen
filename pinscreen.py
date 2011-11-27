@@ -98,7 +98,7 @@ def parse_mtrack2(fileobj):
     for line in fileobj.readlines():
         line = line[:-1].split('\t')
         if not assignments:
-            x, y = [(i, line[col]) for i, col in enumerate(x_col)], [(i, line[col]) for i, col in enumerate(y_col)]
+            x, y = [(i, float(line[col])) for i, col in enumerate(x_col)], [(i, float(line[col])) for i, col in enumerate(y_col)]
             x = sorted(x, cmp=lambda a,b: cmp(a[1], b[1]))
             y = sorted(y, cmp=lambda a,b: cmp(a[1], b[1]))
             xi, yi = [None]*n, [None]*n
@@ -179,8 +179,8 @@ def process_coordinates(fit_parameters):
     # start, for shits and giggles, by finding a coordinate system based on the center of the device.
     # assume the outer dots make a perfect square and (0,0) is upper left.
     X, Y = 0, 1
-    center_x = (fit_parameters[-1][0].offset-fit_parameters[-1][0].amplitude) - (fit_parameters[0][0].offset+fit_parameters[0][0].amplitude)
-    center_y = (fit_parameters[-1][1].offset-fit_parameters[-1][1].amplitude) - (fit_parameters[0][1].offset+fit_parameters[0][1].amplitude)
+    center_x = ((fit_parameters[-1][0].offset-fit_parameters[-1][0].amplitude) - (fit_parameters[0][0].offset+fit_parameters[0][0].amplitude))/2+fit_parameters[0][0].offset
+    center_y = ((fit_parameters[-1][1].offset-fit_parameters[-1][1].amplitude) - (fit_parameters[0][1].offset+fit_parameters[0][1].amplitude))/2+fit_parameters[0][1].offset
     displacement_sign_x = [sign(dot[X].offset-center_x) for dot in fit_parameters] # negative left of center, positive right of center
     displacement_sign_y = [sign(dot[Y].offset-center_y) for dot in fit_parameters] # negative above center, positive below center
 
@@ -251,7 +251,7 @@ def write_plots(frames, fit_parameters, directory, dt=1/30.0):
         plt.title('Dot %d' % idot)
         plt.xlabel('Time (s)')
         plt.ylabel('Displacement (px)')
-        plt.legend(['in X', 'fit in X', 'in Y', 'fit in Y'])
+        # plt.legend(['in X', 'fit in X', 'in Y', 'fit in Y'])
         axes = plt.gca()
         axes.text(0.95, 0.5, r"""x: $%.2f sin(\frac{2 \pi}{%.2f} t + %.2f) + %.2f$; $R^2=%.4f$
 y: $%.2f sin(\frac{2 \pi}{%.2f} t + %.2f) + %.2f$; $R^2=%.4f$""" % (fit_x.amplitude, fit_x.period, fit_x.phase, fit_x.offset, fit_x.r2, fit_y.amplitude, fit_y.period, fit_y.phase, fit_y.offset, fit_y.r2), verticalalignment='center', horizontalalignment='right', transform=axes.transAxes)
@@ -263,7 +263,8 @@ y: $%.2f sin(\frac{2 \pi}{%.2f} t + %.2f) + %.2f$; $R^2=%.4f$""" % (fit_x.amplit
     plt.axis([0,100,100,0])
     plt.quiver(resting_x, resting_y,
                [extended_x[i]-resting_x[i] for i in xrange(len(resting_x))],
-               [extended_y[i]-resting_y[i] for i in xrange(len(resting_y))])
+               [extended_y[i]-resting_y[i] for i in xrange(len(resting_y))],
+               units='xy', angles='xy', scale=1.0)
     #plt.scatter(resting_x, resting_y, c='b')
     #plt.scatter(extended_x, extended_y, c='r')
     plt.savefig('%s/coordinates.png' % directory)

@@ -8,18 +8,19 @@ import numpy as np
 import matplotlib as mpl
 mpl.use('TkAgg')
 import matplotlib.pyplot as plt
-from pinscreen import parse_csv, sinefit, censor_outliers, process_coordinates
+from pinscreen import parse_mtrack2, sinefit, censor_outliers, process_coordinates, recenter
 from math import pi
 
 def colormap(n):
     return ['#'+md5.md5(str(i)).hexdigest()[:6] for i in range(n)]
 
 def main(dotfile):
-    frames = parse_csv(open(dotfile, 'rU'))
+    frames = parse_mtrack2(open(dotfile, 'rU'))
     colors = colormap(len(frames[0]))
+    frames = recenter(frames)
     fit_parameters = sinefit(frames)
-    frames = censor_outliers(frames, fit_parameters)
-    fit_parameters = sinefit(frames)
+    #frames = censor_outliers(frames, fit_parameters)
+    #fit_parameters = sinefit(frames)
     (center_x, center_y, resting_x, resting_y, extended_x, extended_y) = process_coordinates(fit_parameters)
 
     plt.ion()
@@ -31,7 +32,7 @@ def main(dotfile):
     while 1:
         for i, frame in enumerate(frames):
             plt.cla()
-            plt.axis([0,50,50,0])
+            plt.axis([0,100,100,0])
             x, y = zip(*[(dot.xpos, dot.ypos) for dot in frame])
             area = [(dot.perim/(2*pi))**2*pi*5 for dot in frame]
             plt.scatter(resting_x, resting_y, c='b')
