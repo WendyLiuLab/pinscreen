@@ -17,7 +17,7 @@ def colormap(n):
 def main(dotfile):
     frames = parse_mtrack2(open(dotfile, 'rU'))
     colors = colormap(len(frames[0]))
-    frames = recenter(frames)
+    frames, jitter = recenter(frames)
     fit_parameters = sinefit(frames)
     #frames = censor_outliers(frames, fit_parameters)
     #fit_parameters = sinefit(frames)

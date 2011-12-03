@@ -1,10 +1,10 @@
 #!/usr/bin/env python
 
-import sys, csv, os
+import sys, os
 import scipy as sp
 import numpy as np
 import matplotlib as mpl
-if __name__ == '__main__': mpl.use('Agg')
+if __name__ == '__main__': mpl.use('Agg') # we need to do this right away
 import matplotlib.pyplot as plt
 from scipy import optimize, stats
 from math import pi, sin, floor, copysign, sqrt
@@ -12,6 +12,7 @@ from math import pi, sin, floor, copysign, sqrt
 sign = lambda x: copysign(1, x)
 
 class Dot:
+    "Simple class to hold an (x,y) pair."
     def __init__(self, xpos, ypos, perim):
         self.xpos = xpos
         self.ypos = ypos
@@ -21,6 +22,7 @@ class Dot:
         return 'Dot(xpos=%f, ypos=%f, perim=%f)' % (self.xpos, self.ypos, self.perim)
 
 class SineFit:
+    "Stores parameters for an arbitrary sine function."
     def __init__(self, amplitude, period, phase, offset, r2 = None):
         self.amplitude = amplitude
         self.period = period
@@ -39,6 +41,7 @@ class SineFit:
             self.phase -= floor((self.phase+pi)/(2*pi))*(2*pi)
 
     def eval(self, t):
+        "SineFit.eval(self,t): Evaluate the sine function represented by self at a point or list of points t."
         singleton = not getattr(t, '__iter__', False)
         if singleton: t = [t]
         ret = [self.amplitude * sin(2*pi/self.period * ti + self.phase) + self.offset for ti in t]
@@ -53,31 +56,9 @@ class SineFit:
         return ''.join(l)
 
 def usage():
-    print 'pinscreen.py dots.csv plot_output_dir'
+    print 'pinscreen.py dots.txt plot_output_dir'
     print 'Creates plots as plot_output_dir/dot_1_fit.png...'
     print 'plot_output_dir should not exist before running pinscreen.py.'
-
-def parse_csv(fileobj):
-    """frames = parse_csv(filename)
-
-    Reads in ImageJ dot-tracker output of the form:
-    stack.tif:<frame>,<xmedian>,<ymedian>,<perimeter>
-
-    Converts it into a list of lists of Dot objects:
-    frames[0] = [Dot0, Dot1...]
-    """
-    last_frame = None
-    frames = []
-    csv_reader = csv.reader(fileobj)
-    csv_reader.next() # discard the first row
-    for row in csv_reader:
-        if row[0] != last_frame:
-            last_frame = row[0]
-            frames.append([])
-        frames[-1].append( Dot(*[float(i) for i in row[1:]]) )
-    # do some mild consistency checking: should have the same number of dots in all frames
-    if not all([len(frame) == len(frames[0]) for frame in frames]): raise "Consistency error in input."
-    return frames
 
 def parse_mtrack2(fileobj):
     """frames = parse_mtrack2(fileobj)
@@ -98,6 +79,11 @@ def parse_mtrack2(fileobj):
     for line in fileobj.readlines():
         line = line[:-1].split('\t')
         if not assignments:
+            # MTrack2 does not guarantee that the dots will be enumerated in any particular order,
+            # so we have to figure out which dot in the file is our dot 1. We do this by sorting
+            # the dots in the file by both x and y. For an n x n matrix, if a dot has one of the
+            # n lowest x values, it must be in the first column; if it's not in the first n but
+            # is in the first 2n, it must be in the second column, and so on.
             x, y = [(i, float(line[col])) for i, col in enumerate(x_col)], [(i, float(line[col])) for i, col in enumerate(y_col)]
             x = sorted(x, cmp=lambda a,b: cmp(a[1], b[1]))
             y = sorted(y, cmp=lambda a,b: cmp(a[1], b[1]))
@@ -136,12 +122,16 @@ def sinefit(frames, dt = 1.0/30.0):
     for idot in xrange(len(frames[0])):
         print 'Sine fitting: dot %d' % idot
         dx, dy = zip(*[(frame[idot].xpos, frame[idot].ypos) for frame in frames])
+        p0[0] = (max(dx)-min(dx))/2.0
+        p0[3] = np.mean(dx)
         # FIXME: "success" here is not a valid success measure
         px, success = optimize.leastsq(errfunc, p0, args=(t, dx))
         if not success:
             raise "Problem with optimize for dot %d in x" % idot
         xfit = SineFit(*px)
         xfit.r2 = stats.mstats.pearsonr(dx, xfit.eval(t))[0] ** 2
+        p0[0] = (max(dy)-min(dy))/2.0
+        p0[3] = np.mean(dy)
         py, success = optimize.leastsq(errfunc, p0, args=(t, dy))
         if not success:
             raise "Problem with optimize for dot %d in y" % idot
@@ -151,32 +141,10 @@ def sinefit(frames, dt = 1.0/30.0):
 
     return fit_parameters
 
-def censor_outliers(frames, fit_parameters, k = 3, noise=0.1):
-    """frames = censor_outliers(frames, fit_parameters, k=3)
-    Sometimes we get points way out of band. Remove them with extreme prejudice.
-    Deletes points more than k*amplitude away from the DC offset by replacing them with their left neighbor."""
-    for frame_idx, frame in enumerate(frames):
-        for di, dot in enumerate(frame):
-            fit_x, fit_y = fit_parameters[di]
-            last_x, last_y = None, None
-            if frame_idx == 0:
-                last_x, last_y = fit_x.eval(0), fit_y.eval(0)
-            else:
-                last_dot = frames[frame_idx-1][di]
-                last_x, last_y = last_dot.xpos, last_dot.ypos
-            if fit_x.amplitude > noise and (dot.xpos < (fit_x.offset - k*fit_x.amplitude) or dot.xpos > (fit_x.offset + k*fit_x.amplitude)):
-                print 'identified outlier: frame %d dot %d x' % (frame_idx, di)
-                print '  outlier position: %f new position: %f' % (dot.xpos, last_x)
-                frames[frame_idx][di].xpos = last_x
-            if fit_y.amplitude > noise and (dot.ypos < (fit_y.offset - k*fit_y.amplitude) or dot.ypos > (fit_y.offset + k*fit_y.amplitude)):
-                print 'identified outlier: frame %d dot %d y' % (frame_idx, di)
-                print '  outlier position: %f new position: %f' % (dot.ypos, last_y)
-                frames[frame_idx][di].ypos = last_y
-    return frames
-
 def process_coordinates(fit_parameters):
-    # (center_x, center_y, resting_x, resting_y, extended_x, extended_y) = process_coordinates(fit_parameters)
-    # start, for shits and giggles, by finding a coordinate system based on the center of the device.
+    """(center_x, center_y, resting_x, resting_y, extended_x, extended_y) = process_coordinates(fit_parameters)
+    finds the resting and extended position for each dot, using the sine fit parameters."""
+    # start by finding a coordinate system based on the center of the device.
     # assume the outer dots make a perfect square and (0,0) is upper left.
     X, Y = 0, 1
     center_x = ((fit_parameters[-1][0].offset-fit_parameters[-1][0].amplitude) - (fit_parameters[0][0].offset+fit_parameters[0][0].amplitude))/2+fit_parameters[0][0].offset
@@ -197,6 +165,14 @@ def find_center_by_frame(frames):
     return [(np.mean([dot.xpos for dot in frame]), np.mean([dot.ypos for dot in frame])) for frame in frames]
 
 def recenter(frames):
+    """frames, [[residuals_x, residuals_y]] = recenter(frames)
+    If the center of the device moved while your movie was running, that would
+    be bad. But if you were providing a symmetric stretch, we can correct for
+    it. This function makes sure that all frames have the same center point.
+    It works on the assumption that (mean(x), mean(y)) is always the true
+    center of the device. It computes an x offset and y offset value for each
+    frame and then adds the same offset to all points within a frame to
+    recenter it."""
     center_by_frame = find_center_by_frame(frames)
     center_x, center_y = center_by_frame[0]
     centers_x, centers_y = zip(*center_by_frame)
@@ -208,7 +184,7 @@ def recenter(frames):
         for dot in frame:
             dot.xpos -= centers_x[i]
             dot.ypos -= centers_y[i]
-    return frames
+    return frames, [centers_x, centers_y]
 
 def calculate_peak_strain(fit_parameters, resting_x, resting_y, extended_x, extended_y):
     # calculate strain at peak extension
@@ -235,11 +211,13 @@ def calculate_peak_strain(fit_parameters, resting_x, resting_y, extended_x, exte
             strain_y.append( (extended_y[di+n] - extended_y[di-n] - (resting_y[di+n] - resting_y[di-n]) ) / (resting_y[di+n] - resting_y[di-n]) )
     return (strain_x, strain_y)
 
-def write_plots(frames, fit_parameters, directory, dt=1/30.0):
+def write_plots(frames, fit_parameters, jitter, directory, min_strain=-0.1, max_strain=0.3, dt=1/30.0):
     # draw residual plots for each sine fit in x and y
     t = np.arange(len(frames)) * dt
     fit = lambda t, sf: sf.eval(t)
     
+    # TODO show phase for each regression
+
     # plot the sine fits first
     for idot in xrange(len(frames[0])):
         actual_x = [frame[idot].xpos for frame in frames]
@@ -260,21 +238,33 @@ y: $%.2f sin(\frac{2 \pi}{%.2f} t + %.2f) + %.2f$; $R^2=%.4f$""" % (fit_x.amplit
     # plot the resting and extended coordinates
     (center_x, center_y, resting_x, resting_y, extended_x, extended_y) = process_coordinates(fit_parameters)
     plt.clf()
-    plt.axis([0,100,100,0])
+    plt.axis([center_x-50, center_x+50, center_y+50, center_y-50])
     plt.quiver(resting_x, resting_y,
-               [extended_x[i]-resting_x[i] for i in xrange(len(resting_x))],
-               [extended_y[i]-resting_y[i] for i in xrange(len(resting_y))],
+               [ext-rest for (ext, rest) in zip(extended_x, resting_x)],
+               [ext-rest for (ext, rest) in zip(extended_y, resting_y)],
+#               [extended_x[i]-resting_x[i] for i in xrange(len(resting_x))], # FIXME remove this after testing
+#               [extended_y[i]-resting_y[i] for i in xrange(len(resting_y))],
                units='xy', angles='xy', scale=1.0)
-    #plt.scatter(resting_x, resting_y, c='b')
-    #plt.scatter(extended_x, extended_y, c='r')
     plt.savefig('%s/coordinates.png' % directory)
+
+    # plot coordinate system jitter
+    plt.clf()
+    plt.plot(t, jitter[0], t, jitter[1])
+    plt.legend(['x', 'y'])
+    plt.savefig('%s/center_displacement.png' % directory)
+    plt.clf()
+    center_by_frame = find_center_by_frame(frames)
+    plt.plot(t, zip(*center_by_frame)[0], t, zip(*center_by_frame)[1])
+    plt.savefig('%s/center_position_post.png' % directory)
 
     n = int(sqrt(len(fit_parameters)))
     peak_strain = calculate_peak_strain(fit_parameters, resting_x, resting_y, extended_x, extended_y)
+    min_strain = min_strain or min(peak_strain[0] + peak_strain[1])
+    max_strain = max_strain or max(peak_strain[0] + peak_strain[1])
     matrix = lambda axis: np.array(peak_strain[axis]).reshape(n,n)
     for (axis, label) in [(0, 'x'), (1, 'y')]:
         plt.clf()
-        plt.pcolor(matrix(axis), edgecolor='k')
+        plt.pcolor(matrix(axis), edgecolor='k', vmin=min_strain, vmax=max_strain)
         ax = plt.gca()
         ax.set_ylim(ax.get_ylim()[::-1])        
         plt.colorbar()
@@ -283,9 +273,10 @@ y: $%.2f sin(\frac{2 \pi}{%.2f} t + %.2f) + %.2f$; $R^2=%.4f$""" % (fit_x.amplit
     f = open('%s/index.html' % directory, 'w')
     print >> f, "<!DOCTYPE html>\n<html><head><title>Regression results</title></head><body>"
     print >> f, '<h1>Dot positions</h1><img src="coordinates.png" />'
-#    print >> f, '<h1>Center displacement (pre-correction)</h1><img src="center_displacement.png" />'
-#    print >> f, '<h1>Center displacement (post-correction)</h1><img src="center_displacement_post.png" />'
-    print >> f, '<h1>Peak strain: x</h1><img src="peakstrain_x.png" /><h1>Peak strain: y</h1><img src="peakstrain_y.png" />'
+    print >> f, '<h1>Center displacement (pre-correction)</h1><img src="center_displacement.png" />'
+    print >> f, '<h1>Center position (post-correction)</h1><img src="center_position_post.png" />'
+    print >> f, '<h1>Peak strain: x</h1><img src="peakstrain_x.png" /><p>Mean peak x strain: %f Standard deviation: %f</p>' % (np.mean(peak_strain[0]), np.std(peak_strain[0]))
+    print >> f, '<h1>Peak strain: y</h1><img src="peakstrain_y.png" /><p>Mean peak y strain: %f Standard deviation: %f</p>' % (np.mean(peak_strain[1]), np.std(peak_strain[1]))
     for idot in xrange(len(frames[0])):
         print >> f, '<h1>Dot %d</h1><img src="dot_%04d_fit.png" />' % (idot, idot)
     print >> f, '</body></html>'
@@ -299,14 +290,13 @@ def main(argv):
         sys.exit(1)
     os.mkdir(argv[2]) # do this first so we aren't surprised later
     f = open(sys.argv[1], 'rU')
-    #frames = parse_csv(f)
     frames = parse_mtrack2(f)
     f.close()
-    frames = recenter(frames)
+    frames, jitter = recenter(frames)
     fit_parameters = sinefit(frames)
-#    frames = censor_outliers(frames, fit_parameters)
+#    frames = pinscreen-legacy.censor_outliers(frames, fit_parameters)
 #    fit_parameters = sinefit(frames)
-    write_plots(frames, fit_parameters, sys.argv[2])
+    write_plots(frames, fit_parameters, jitter, directory=sys.argv[2], min_strain=-0.1, max_strain=0.3)
 
 if __name__ == '__main__':
     main(sys.argv)
