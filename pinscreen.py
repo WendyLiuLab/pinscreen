@@ -1,17 +1,21 @@
 #!/usr/bin/env python
 
-import sys, os
+from copy import deepcopy
+import os
+import sys
+
 import scipy as sp
-import numpy as np
 import matplotlib as mpl
-if __name__ == '__main__': mpl.use('Agg') # we need to do this right away
+if __name__ == "__main__": mpl.use('Agg')  # we need to do this right away
+import numpy as np
+from numpy import pi, sin, floor, copysign, sqrt
 import matplotlib.pyplot as plt
 from scipy import optimize, stats
 from scipy.signal import sawtooth
-from math import pi, sin, floor, copysign, sqrt
-from copy import deepcopy
+
 
 sign = lambda x: copysign(1, x)
+
 
 class Dot:
     "Simple class to hold an (x,y) pair."
