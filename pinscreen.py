@@ -27,6 +27,7 @@ class Dot:
     def __repr__(self):
         return 'Dot(xpos=%f, ypos=%f, perim=%f)' % (self.xpos, self.ypos, self.perim)
 
+
 class SineFit:
     "Stores parameters for an arbitrary sine function."
     def __init__(self, amplitude, period, phase, offset, r2 = None):
@@ -110,7 +111,7 @@ def parse_mtrack2(fileobj):
         frames.append(frame)
     print [i for i in enumerate(assignments)]
     return frames
-            
+
 
 def sinefit(frames, dt = 1.0/30.0):
     """fit_parameters = sinefit(frames)
@@ -168,7 +169,7 @@ def process_coordinates(fit_parameters):
     resting_x = [xfit.eval(yfit.period/(2*pi) * (pi/2 - yfit.phase)) for (xfit, yfit) in fit_parameters]
 
     # extended positions fall when the x coordinate is furthest from the center
-    # we want: extended positions to fell when the 
+    # we want: extended positions to fell when the
     extended_y = [dot[Y].offset - dot[Y].amplitude for dot in fit_parameters]
     extended_x = [xfit.eval(yfit.period/(2*pi) * (3*pi/2 - yfit.phase)) for (xfit, yfit) in fit_parameters]
     # resting_x = [xfit.eval(2*pi*yfit.phase / yfit.period) for (xfit, yfit) in fit_parameters]
@@ -232,7 +233,7 @@ def write_plots(frames, fit_parameters, jitter, directory, min_strain=-0.1, max_
     # draw residual plots for each sine fit in x and y
     t = np.arange(len(frames)) * dt
     fit = lambda t, sf: sf.eval(t)
-    
+
     # TODO show phase for each regression
 
     # plot the sine fits first
@@ -251,7 +252,7 @@ def write_plots(frames, fit_parameters, jitter, directory, min_strain=-0.1, max_
         axes.text(0.95, 0.5, r"""x: $%.2f sin(\frac{2 \pi}{%.2f} t + %.2f) + %.2f$; $R^2=%.4f$
 y: $%.2f sin(\frac{2 \pi}{%.2f} t + %.2f) + %.2f$; $R^2=%.4f$""" % (fit_x.amplitude, fit_x.period, fit_x.phase, fit_x.offset, fit_x.r2, fit_y.amplitude, fit_y.period, fit_y.phase, fit_y.offset, fit_y.r2), verticalalignment='center', horizontalalignment='right', transform=axes.transAxes)
         plt.savefig('%s/dot_%04d_fit.png' % (directory, idot))
-    
+
     # plot the resting and extended coordinates
     (center_x, center_y, resting_x, resting_y, extended_x, extended_y) = process_coordinates(fit_parameters)
     plt.clf()
@@ -287,7 +288,7 @@ y: $%.2f sin(\frac{2 \pi}{%.2f} t + %.2f) + %.2f$; $R^2=%.4f$""" % (fit_x.amplit
             for j in range(n):
                 plt.text(i+0.5,j+0.5,"%.4f" % matrix(axis)[j,i],horizontalalignment='center',verticalalignment='center')
         ax = plt.gca()
-        ax.set_ylim(ax.get_ylim()[::-1])        
+        ax.set_ylim(ax.get_ylim()[::-1])
         plt.colorbar(ticks=[-.05,0,.05,.1,.15,.2,.25])
         plt.savefig('%s/peakstrain_%s.png' % (directory, label))
 
