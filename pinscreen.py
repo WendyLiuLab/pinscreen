@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 
+import argparse
 from copy import deepcopy
 import os
 import sys
@@ -62,10 +63,6 @@ class SineFit:
         else: l.append('%f)' % self.r2)
         return ''.join(l)
 
-def usage():
-    print 'pinscreen.py dots.txt plot_output_dir'
-    print 'Creates plots as plot_output_dir/dot_1_fit.png...'
-    print 'plot_output_dir should not exist before running pinscreen.py.'
 
 def parse_mtrack2(fileobj):
     """frames = parse_mtrack2(fileobj)
@@ -312,19 +309,25 @@ y: $%.2f sin(\frac{2 \pi}{%.2f} t + %.2f) + %.2f$; $R^2=%.4f$""" % (fit_x.amplit
     print >> f, '</body></html>'
     f.close()
 
-def main(argv):
-    # sys.argv = [-, input filename, output directory]
-    # output directory should not exist:
-    if len(argv) != 3 or os.path.exists(argv[2]):
-        usage()
-        sys.exit(1)
-    os.mkdir(argv[2]) # do this first so we aren't surprised later
-    f = open(sys.argv[1], 'rU')
+
+def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument('infile')
+    parser.add_argument('outpath')
+    parser.add_argument('--overwrite', '-O', action='store_true')
+    args = parser.parse_args()
+    try:
+        os.makedirs(args.outpath)  # do this first so we aren't surprised later
+    except OSError:
+        if not args.overwrite:
+            print >> sys.stderr, "Output path exists. Use --overwrite to run anyway."
+            sys.exit(1)
+    f = open(args.infile, 'rU')
     frames = parse_mtrack2(f)
     f.close()
     centered_frames, jitter = recenter(frames)
     fit_parameters = sinefit(frames)
-    write_plots(frames, fit_parameters, jitter, directory=sys.argv[2], min_strain=-0.05, max_strain=0.25)
+    write_plots(frames, fit_parameters, jitter, directory=args.outpath, min_strain=-0.05, max_strain=0.25)
 
 if __name__ == '__main__':
-    main(sys.argv)
+    main()
