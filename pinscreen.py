@@ -7,6 +7,7 @@ import matplotlib as mpl
 if __name__ == '__main__': mpl.use('Agg') # we need to do this right away
 import matplotlib.pyplot as plt
 from scipy import optimize, stats
+from scipy.signal import sawtooth
 from math import pi, sin, floor, copysign, sqrt
 
 sign = lambda x: copysign(1, x)
@@ -44,7 +45,7 @@ class SineFit:
         "SineFit.eval(self,t): Evaluate the sine function represented by self at a point or list of points t."
         singleton = not getattr(t, '__iter__', False)
         if singleton: t = [t]
-        ret = [self.amplitude * sin(2*pi/self.period * ti + self.phase) + self.offset for ti in t]
+        ret = [self.amplitude * sawtooth(2*pi/self.period * ti + self.phase, width=0.5) + self.offset for ti in t]
         if singleton: return ret[0]
         return ret
 
@@ -113,7 +114,7 @@ def sinefit(frames, dt = 1.0/30.0):
     """
 
     # p = [amplitude, period, phase offset, y offset]
-    fitfunc = lambda p, x: np.array([p[0]*sin(2*pi/p[1]*xi + p[2]) + p[3] for xi in x])
+    fitfunc = lambda p, x: p[0] * sawtooth(2*pi/p[1]*x + p[2], width=0.5) + p[3]
     errfunc = lambda p, x, y: fitfunc(p, x) - y
     p0 = [1., 1., 0., 0.]
     t = np.arange(len(frames)) * dt
