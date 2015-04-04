@@ -296,7 +296,7 @@ def main(argv):
     f = open(sys.argv[1], 'rU')
     frames = parse_mtrack2(f)
     f.close()
-    frames, jitter = recenter(frames)
+    centered_frames, jitter = recenter(frames)
     fit_parameters = sinefit(frames)
 #    frames = pinscreen-legacy.censor_outliers(frames, fit_parameters)
 #    fit_parameters = sinefit(frames)
