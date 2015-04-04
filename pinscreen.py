@@ -7,7 +7,9 @@ import matplotlib as mpl
 if __name__ == '__main__': mpl.use('Agg') # we need to do this right away
 import matplotlib.pyplot as plt
 from scipy import optimize, stats
+from scipy.signal import sawtooth
 from math import pi, sin, floor, copysign, sqrt
+from copy import deepcopy
 
 sign = lambda x: copysign(1, x)
 
@@ -44,7 +46,7 @@ class SineFit:
         "SineFit.eval(self,t): Evaluate the sine function represented by self at a point or list of points t."
         singleton = not getattr(t, '__iter__', False)
         if singleton: t = [t]
-        ret = [self.amplitude * sin(2*pi/self.period * ti + self.phase) + self.offset for ti in t]
+        ret = [self.amplitude * sawtooth(2*pi/self.period * ti + self.phase, width=0.5) + self.offset for ti in t]
         if singleton: return ret[0]
         return ret
 
@@ -84,7 +86,8 @@ def parse_mtrack2(fileobj):
             # the dots in the file by both x and y. For an n x n matrix, if a dot has one of the
             # n lowest x values, it must be in the first column; if it's not in the first n but
             # is in the first 2n, it must be in the second column, and so on.
-            x, y = [(i, float(line[col])) for i, col in enumerate(x_col)], [(i, float(line[col])) for i, col in enumerate(y_col)]
+            x, y = ([(i, float(line[col])) for i, col in enumerate(x_col)],
+                    [(i, float(line[col])) for i, col in enumerate(y_col)])
             x = sorted(x, cmp=lambda a,b: cmp(a[1], b[1]))
             y = sorted(y, cmp=lambda a,b: cmp(a[1], b[1]))
             xi, yi = [None]*n, [None]*n
@@ -113,7 +116,7 @@ def sinefit(frames, dt = 1.0/30.0):
     """
 
     # p = [amplitude, period, phase offset, y offset]
-    fitfunc = lambda p, x: np.array([p[0]*sin(2*pi/p[1]*xi + p[2]) + p[3] for xi in x])
+    fitfunc = lambda p, x: p[0] * sawtooth(2*pi/p[1]*x + p[2], width=0.5) + p[3]
     errfunc = lambda p, x, y: fitfunc(p, x) - y
     p0 = [1., 1., 0., 0.]
     t = np.arange(len(frames)) * dt
@@ -148,17 +151,26 @@ def process_coordinates(fit_parameters):
     # assume the outer dots make a perfect square and (0,0) is upper left.
     X, Y = 0, 1
     center_x = ((fit_parameters[-1][0].offset-fit_parameters[-1][0].amplitude) - (fit_parameters[0][0].offset+fit_parameters[0][0].amplitude))/2+fit_parameters[0][0].offset
-    center_y = ((fit_parameters[-1][1].offset-fit_parameters[-1][1].amplitude) - (fit_parameters[0][1].offset+fit_parameters[0][1].amplitude))/2+fit_parameters[0][1].offset
-    displacement_sign_x = [sign(dot[X].offset-center_x) for dot in fit_parameters] # negative left of center, positive right of center
-    displacement_sign_y = [sign(dot[Y].offset-center_y) for dot in fit_parameters] # negative above center, positive below center
+    center_y = ((fit_parameters[-1][1].offset-fit_parameters[-1][1].amplitude) - (fit_parameters[0][1].offset+fit_parameters[0][1].amplitude))+fit_parameters[0][1].offset
+    #displacement_sign_x = [sign(dot[X].offset-center_x) for dot in fit_parameters] # negative left of center, positive right of center
+    #displacement_sign_y = [sign(dot[Y].offset-center_y) for dot in fit_parameters] # negative above center, positive below center
 
     # resting positions fall when the x coordinate is closest to the center
-    resting_x = [dot[X].offset - displacement_sign_x[di]*dot[X].amplitude for (di, dot) in enumerate(fit_parameters)]
-    resting_y =  [yfit.eval(xfit.period/(2*pi) * ((1-displacement_sign_x[di])*pi/4.0 - xfit.phase)) for (di, (xfit, yfit)) in enumerate(fit_parameters)]
+    # we want: resting posistions to fall when the x coordinate is furthest from center
+    #extended_x = [dot[X].offset - displacement_sign_x[di]*dot[X].amplitude for (di, dot) in enumerate(fit_parameters)]
+    #extended_y =  [yfit.eval(xfit.period/(2*pi) * ((1-displacement_sign_x[di])*pi/4.0 - xfit.phase)) for (di, (xfit, yfit)) in enumerate(fit_parameters)]
+
+    resting_y = [dot[Y].offset + dot[Y].amplitude for dot in fit_parameters]
+    resting_x = [xfit.eval(yfit.period/(2*pi) * (pi/2 - yfit.phase)) for (xfit, yfit) in fit_parameters]
 
     # extended positions fall when the x coordinate is furthest from the center
-    extended_x = [dot[X].offset + displacement_sign_x[di]*dot[X].amplitude for (di, dot) in enumerate(fit_parameters)]
-    extended_y = [yfit.eval(xfit.period/(2*pi) * ((1+displacement_sign_x[di])*pi/4.0 - xfit.phase)) for (di, (xfit, yfit)) in enumerate(fit_parameters)]
+    # we want: extended positions to fell when the 
+    extended_y = [dot[Y].offset - dot[Y].amplitude for dot in fit_parameters]
+    extended_x = [xfit.eval(yfit.period/(2*pi) * (3*pi/2 - yfit.phase)) for (xfit, yfit) in fit_parameters]
+    # resting_x = [xfit.eval(2*pi*yfit.phase / yfit.period) for (xfit, yfit) in fit_parameters]
+
+    #resting_x = [dot[X].offset + displacement_sign_x[di]*dot[X].amplitude for (di, dot) in enumerate(fit_parameters)]
+    # resting_y = [yfit.eval(xfit.period/(2*pi) * ((1+displacement_sign_x[di])*pi/4.0 - xfit.phase)) for (di, (xfit, yfit)) in enumerate(fit_parameters)]
     return (center_x, center_y, resting_x, resting_y, extended_x, extended_y)
 
 def find_center_by_frame(frames):
@@ -173,6 +185,7 @@ def recenter(frames):
     center of the device. It computes an x offset and y offset value for each
     frame and then adds the same offset to all points within a frame to
     recenter it."""
+    frames = deepcopy(frames)
     center_by_frame = find_center_by_frame(frames)
     center_x, center_y = center_by_frame[0]
     centers_x, centers_y = zip(*center_by_frame)
@@ -238,7 +251,8 @@ y: $%.2f sin(\frac{2 \pi}{%.2f} t + %.2f) + %.2f$; $R^2=%.4f$""" % (fit_x.amplit
     # plot the resting and extended coordinates
     (center_x, center_y, resting_x, resting_y, extended_x, extended_y) = process_coordinates(fit_parameters)
     plt.clf()
-    plt.axis([center_x-50, center_x+50, center_y+50, center_y-50])
+    # plt.axis([center_x-50, center_x+50, center_y+50, center_y-50])
+    plt.axis([0,1000,1000,0])
     plt.quiver(resting_x, resting_y,
                [ext-rest for (ext, rest) in zip(extended_x, resting_x)],
                [ext-rest for (ext, rest) in zip(extended_y, resting_y)],
@@ -265,9 +279,12 @@ y: $%.2f sin(\frac{2 \pi}{%.2f} t + %.2f) + %.2f$; $R^2=%.4f$""" % (fit_x.amplit
     for (axis, label) in [(0, 'x'), (1, 'y')]:
         plt.clf()
         plt.pcolor(matrix(axis), edgecolor='k', vmin=min_strain, vmax=max_strain)
+        for i in range(n):
+            for j in range(n):
+                plt.text(i+0.5,j+0.5,"%.4f" % matrix(axis)[j,i],horizontalalignment='center',verticalalignment='center')
         ax = plt.gca()
         ax.set_ylim(ax.get_ylim()[::-1])        
-        plt.colorbar()
+        plt.colorbar(ticks=[-.05,0,.05,.1,.15,.2,.25])
         plt.savefig('%s/peakstrain_%s.png' % (directory, label))
 
     f = open('%s/index.html' % directory, 'w')
@@ -292,11 +309,11 @@ def main(argv):
     f = open(sys.argv[1], 'rU')
     frames = parse_mtrack2(f)
     f.close()
-    frames, jitter = recenter(frames)
+    centered_frames, jitter = recenter(frames)
     fit_parameters = sinefit(frames)
 #    frames = pinscreen-legacy.censor_outliers(frames, fit_parameters)
 #    fit_parameters = sinefit(frames)
-    write_plots(frames, fit_parameters, jitter, directory=sys.argv[2], min_strain=-0.1, max_strain=0.3)
+    write_plots(frames, fit_parameters, jitter, directory=sys.argv[2], min_strain=-0.05, max_strain=0.25)
 
 if __name__ == '__main__':
     main(sys.argv)
