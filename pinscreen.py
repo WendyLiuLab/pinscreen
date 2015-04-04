@@ -90,9 +90,9 @@ def parse_mtrack2(fileobj):
             x = sorted(x, cmp=lambda a,b: cmp(a[1], b[1]))
             y = sorted(y, cmp=lambda a,b: cmp(a[1], b[1]))
             xi, yi = [None]*n, [None]*n
-            for sort_i, (file_i, value) in enumerate(x): #@UnusedVariable
+            for sort_i, (file_i, _value) in enumerate(x):
                 xi[file_i] = sort_i
-            for sort_i, (file_i, value) in enumerate(y): #@UnusedVariable
+            for sort_i, (file_i, _value) in enumerate(y):
                 yi[file_i] = sort_i
             assignments = [None] * n
             for i in xrange(n):
