@@ -242,7 +242,8 @@ y: $%.2f sin(\frac{2 \pi}{%.2f} t + %.2f) + %.2f$; $R^2=%.4f$""" % (fit_x.amplit
     # plot the resting and extended coordinates
     (center_x, center_y, resting_x, resting_y, extended_x, extended_y) = process_coordinates(fit_parameters)
     plt.clf()
-    plt.axis([center_x-50, center_x+50, center_y+50, center_y-50])
+    # plt.axis([center_x-50, center_x+50, center_y+50, center_y-50])
+    plt.axis([0,1000,1000,0])
     plt.quiver(resting_x, resting_y,
                [ext-rest for (ext, rest) in zip(extended_x, resting_x)],
                [ext-rest for (ext, rest) in zip(extended_y, resting_y)],
