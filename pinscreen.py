@@ -85,7 +85,8 @@ def parse_mtrack2(fileobj):
             # the dots in the file by both x and y. For an n x n matrix, if a dot has one of the
             # n lowest x values, it must be in the first column; if it's not in the first n but
             # is in the first 2n, it must be in the second column, and so on.
-            x, y = [(i, float(line[col])) for i, col in enumerate(x_col)], [(i, float(line[col])) for i, col in enumerate(y_col)]
+            x, y = ([(i, float(line[col])) for i, col in enumerate(x_col)],
+                    [(i, float(line[col])) for i, col in enumerate(y_col)])
             x = sorted(x, cmp=lambda a,b: cmp(a[1], b[1]))
             y = sorted(y, cmp=lambda a,b: cmp(a[1], b[1]))
             xi, yi = [None]*n, [None]*n
