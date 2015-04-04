@@ -57,11 +57,8 @@ class SineFit:
         return ret
 
     def __repr__(self):
-        l = []
-        l.append('SineFit(amplitude=%f, period=%f, phase=%f, offset=%f, r2=' % (self.amplitude, self.period, self.phase, self.offset))
-        if self.r2 is None: l.append('None)')
-        else: l.append('%f)' % self.r2)
-        return ''.join(l)
+        return ('SineFit(amplitude=%f, period=%f, phase=%f, offset=%f, r2=%r)' %
+                (self.amplitude, self.period, self.phase, self.offset, self.r2))
 
 
 def parse_mtrack2(fileobj):
