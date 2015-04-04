@@ -311,8 +311,6 @@ def main(argv):
     f.close()
     centered_frames, jitter = recenter(frames)
     fit_parameters = sinefit(frames)
-#    frames = pinscreen-legacy.censor_outliers(frames, fit_parameters)
-#    fit_parameters = sinefit(frames)
     write_plots(frames, fit_parameters, jitter, directory=sys.argv[2], min_strain=-0.05, max_strain=0.25)
 
 if __name__ == '__main__':

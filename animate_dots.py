@@ -1,4 +1,3 @@
-#!/usr/bin/python
 #!/usr/bin/env python
 
 import sys
@@ -8,7 +7,7 @@ import numpy as np
 import matplotlib as mpl
 mpl.use('TkAgg')
 import matplotlib.pyplot as plt
-from pinscreen import parse_mtrack2, sinefit, censor_outliers, process_coordinates, recenter
+from pinscreen import parse_mtrack2, sinefit, process_coordinates, recenter
 from math import pi
 
 def colormap(n):
@@ -19,8 +18,6 @@ def main(dotfile):
     colors = colormap(len(frames[0]))
     frames, jitter = recenter(frames)
     fit_parameters = sinefit(frames)
-    #frames = censor_outliers(frames, fit_parameters)
-    #fit_parameters = sinefit(frames)
     (center_x, center_y, resting_x, resting_y, extended_x, extended_y) = process_coordinates(fit_parameters)
 
     plt.ion()
