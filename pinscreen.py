@@ -9,6 +9,7 @@ import matplotlib.pyplot as plt
 from scipy import optimize, stats
 from scipy.signal import sawtooth
 from math import pi, sin, floor, copysign, sqrt
+from copy import deepcopy
 
 sign = lambda x: copysign(1, x)
 
@@ -175,6 +176,7 @@ def recenter(frames):
     center of the device. It computes an x offset and y offset value for each
     frame and then adds the same offset to all points within a frame to
     recenter it."""
+    frames = deepcopy(frames)
     center_by_frame = find_center_by_frame(frames)
     center_x, center_y = center_by_frame[0]
     centers_x, centers_y = zip(*center_by_frame)
