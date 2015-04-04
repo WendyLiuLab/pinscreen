@@ -272,7 +272,7 @@ y: $%.2f sin(\frac{2 \pi}{%.2f} t + %.2f) + %.2f$; $R^2=%.4f$""" % (fit_x.amplit
         plt.pcolor(matrix(axis), edgecolor='k', vmin=min_strain, vmax=max_strain)
         ax = plt.gca()
         ax.set_ylim(ax.get_ylim()[::-1])        
-        plt.colorbar()
+        plt.colorbar(ticks=[-.05,0,.05,.1,.15,.2,.25])
         plt.savefig('%s/peakstrain_%s.png' % (directory, label))
 
     f = open('%s/index.html' % directory, 'w')
@@ -301,7 +301,7 @@ def main(argv):
     fit_parameters = sinefit(frames)
 #    frames = pinscreen-legacy.censor_outliers(frames, fit_parameters)
 #    fit_parameters = sinefit(frames)
-    write_plots(frames, fit_parameters, jitter, directory=sys.argv[2], min_strain=-0.1, max_strain=0.3)
+    write_plots(frames, fit_parameters, jitter, directory=sys.argv[2], min_strain=-0.05, max_strain=0.25)
 
 if __name__ == '__main__':
     main(sys.argv)
