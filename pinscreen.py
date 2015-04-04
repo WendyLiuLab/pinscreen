@@ -246,8 +246,12 @@ def write_plots(frames, fit_parameters, jitter, directory, min_strain=-0.1, max_
         plt.ylabel('Displacement (px)')
         # plt.legend(['in X', 'fit in X', 'in Y', 'fit in Y'])
         axes = plt.gca()
-        axes.text(0.95, 0.5, r"""x: $%.2f sin(\frac{2 \pi}{%.2f} t + %.2f) + %.2f$; $R^2=%.4f$
-y: $%.2f sin(\frac{2 \pi}{%.2f} t + %.2f) + %.2f$; $R^2=%.4f$""" % (fit_x.amplitude, fit_x.period, fit_x.phase, fit_x.offset, fit_x.r2, fit_y.amplitude, fit_y.period, fit_y.phase, fit_y.offset, fit_y.r2), verticalalignment='center', horizontalalignment='right', transform=axes.transAxes)
+        axes.text(0.95, 0.5,
+                  (r'x: $%.2f sin(\frac{2 \pi}{%.2f} t + %.2f) + %.2f$; $R^2=%.4f$' '\n'
+                   r'y: $%.2f sin(\frac{2 \pi}{%.2f} t + %.2f) + %.2f$; $R^2=%.4f$'
+                   % (fit_x.amplitude, fit_x.period, fit_x.phase, fit_x.offset, fit_x.r2,
+                      fit_y.amplitude, fit_y.period, fit_y.phase, fit_y.offset, fit_y.r2)),
+                  verticalalignment='center', horizontalalignment='right', transform=axes.transAxes)
         plt.savefig('%s/dot_%04d_fit.png' % (directory, idot))
 
     # plot the resting and extended coordinates
