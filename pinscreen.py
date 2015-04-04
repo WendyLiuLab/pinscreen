@@ -295,10 +295,18 @@ y: $%.2f sin(\frac{2 \pi}{%.2f} t + %.2f) + %.2f$; $R^2=%.4f$""" % (fit_x.amplit
     f = open('%s/index.html' % directory, 'w')
     print >> f, "<!DOCTYPE html>\n<html><head><title>Regression results</title></head><body>"
     print >> f, '<h1>Dot positions</h1><img src="coordinates.png" />'
-    print >> f, '<h1>Center displacement (pre-correction)</h1><img src="center_displacement.png" />'
-    print >> f, '<h1>Center position (post-correction)</h1><img src="center_position_post.png" />'
-    print >> f, '<h1>Peak strain: x</h1><img src="peakstrain_x.png" /><p>Mean peak x strain: %f Standard deviation: %f</p>' % (np.mean(peak_strain[0]), np.std(peak_strain[0]))
-    print >> f, '<h1>Peak strain: y</h1><img src="peakstrain_y.png" /><p>Mean peak y strain: %f Standard deviation: %f</p>' % (np.mean(peak_strain[1]), np.std(peak_strain[1]))
+    print >> f, ('<h1>Center displacement (pre-correction)</h1>'
+                 '<img src="center_displacement.png" />')
+    print >> f, ('<h1>Center position (post-correction)</h1>'
+                 '<img src="center_position_post.png" />')
+    print >> f, ('<h1>Peak strain: x</h1>'
+                 '<img src="peakstrain_x.png" />'
+                 '<p>Mean peak x strain: %f Standard deviation: %f</p>'
+                 % (np.mean(peak_strain[0]), np.std(peak_strain[0])))
+    print >> f, ('<h1>Peak strain: y</h1>'
+                 '<img src="peakstrain_y.png" />'
+                 '<p>Mean peak y strain: %f Standard deviation: %f</p>'
+                 % (np.mean(peak_strain[1]), np.std(peak_strain[1])))
     for idot in xrange(len(frames[0])):
         print >> f, '<h1>Dot %d</h1><img src="dot_%04d_fit.png" />' % (idot, idot)
     print >> f, '</body></html>'
