@@ -151,17 +151,26 @@ def process_coordinates(fit_parameters):
     # assume the outer dots make a perfect square and (0,0) is upper left.
     X, Y = 0, 1
     center_x = ((fit_parameters[-1][0].offset-fit_parameters[-1][0].amplitude) - (fit_parameters[0][0].offset+fit_parameters[0][0].amplitude))/2+fit_parameters[0][0].offset
-    center_y = ((fit_parameters[-1][1].offset-fit_parameters[-1][1].amplitude) - (fit_parameters[0][1].offset+fit_parameters[0][1].amplitude))/2+fit_parameters[0][1].offset
-    displacement_sign_x = [sign(dot[X].offset-center_x) for dot in fit_parameters] # negative left of center, positive right of center
-    displacement_sign_y = [sign(dot[Y].offset-center_y) for dot in fit_parameters] # negative above center, positive below center
+    center_y = ((fit_parameters[-1][1].offset-fit_parameters[-1][1].amplitude) - (fit_parameters[0][1].offset+fit_parameters[0][1].amplitude))+fit_parameters[0][1].offset
+    #displacement_sign_x = [sign(dot[X].offset-center_x) for dot in fit_parameters] # negative left of center, positive right of center
+    #displacement_sign_y = [sign(dot[Y].offset-center_y) for dot in fit_parameters] # negative above center, positive below center
 
     # resting positions fall when the x coordinate is closest to the center
-    resting_x = [dot[X].offset - displacement_sign_x[di]*dot[X].amplitude for (di, dot) in enumerate(fit_parameters)]
-    resting_y =  [yfit.eval(xfit.period/(2*pi) * ((1-displacement_sign_x[di])*pi/4.0 - xfit.phase)) for (di, (xfit, yfit)) in enumerate(fit_parameters)]
+    # we want: resting posistions to fall when the x coordinate is furthest from center
+    #extended_x = [dot[X].offset - displacement_sign_x[di]*dot[X].amplitude for (di, dot) in enumerate(fit_parameters)]
+    #extended_y =  [yfit.eval(xfit.period/(2*pi) * ((1-displacement_sign_x[di])*pi/4.0 - xfit.phase)) for (di, (xfit, yfit)) in enumerate(fit_parameters)]
+
+    resting_y = [dot[Y].offset + dot[Y].amplitude for dot in fit_parameters]
+    resting_x = [xfit.eval(yfit.period/(2*pi) * (pi/2 - yfit.phase)) for (xfit, yfit) in fit_parameters]
 
     # extended positions fall when the x coordinate is furthest from the center
-    extended_x = [dot[X].offset + displacement_sign_x[di]*dot[X].amplitude for (di, dot) in enumerate(fit_parameters)]
-    extended_y = [yfit.eval(xfit.period/(2*pi) * ((1+displacement_sign_x[di])*pi/4.0 - xfit.phase)) for (di, (xfit, yfit)) in enumerate(fit_parameters)]
+    # we want: extended positions to fell when the 
+    extended_y = [dot[Y].offset - dot[Y].amplitude for dot in fit_parameters]
+    extended_x = [xfit.eval(yfit.period/(2*pi) * (3*pi/2 - yfit.phase)) for (xfit, yfit) in fit_parameters]
+    # resting_x = [xfit.eval(2*pi*yfit.phase / yfit.period) for (xfit, yfit) in fit_parameters]
+
+    #resting_x = [dot[X].offset + displacement_sign_x[di]*dot[X].amplitude for (di, dot) in enumerate(fit_parameters)]
+    # resting_y = [yfit.eval(xfit.period/(2*pi) * ((1+displacement_sign_x[di])*pi/4.0 - xfit.phase)) for (di, (xfit, yfit)) in enumerate(fit_parameters)]
     return (center_x, center_y, resting_x, resting_y, extended_x, extended_y)
 
 def find_center_by_frame(frames):
