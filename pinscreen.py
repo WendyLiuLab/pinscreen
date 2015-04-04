@@ -270,6 +270,9 @@ y: $%.2f sin(\frac{2 \pi}{%.2f} t + %.2f) + %.2f$; $R^2=%.4f$""" % (fit_x.amplit
     for (axis, label) in [(0, 'x'), (1, 'y')]:
         plt.clf()
         plt.pcolor(matrix(axis), edgecolor='k', vmin=min_strain, vmax=max_strain)
+        for i in range(n):
+            for j in range(n):
+                plt.text(i+0.5,j+0.5,"%.4f" % matrix(axis)[j,i],horizontalalignment='center',verticalalignment='center')
         ax = plt.gca()
         ax.set_ylim(ax.get_ylim()[::-1])        
         plt.colorbar(ticks=[-.05,0,.05,.1,.15,.2,.25])
