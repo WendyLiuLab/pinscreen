@@ -9,7 +9,7 @@ import scipy as sp
 import matplotlib as mpl
 if __name__ == "__main__": mpl.use('Agg')  # we need to do this right away
 import numpy as np
-from numpy import pi, sin, floor, copysign, sqrt
+from numpy import pi, floor, copysign, sqrt
 import matplotlib.pyplot as plt
 from scipy import optimize, stats
 from scipy.signal import sawtooth
@@ -108,7 +108,7 @@ def parse_mtrack2(fileobj):
     return frames
 
 
-def sinefit(frames, dt=1.0/30.0, sin=np.sin):
+def sinefit(frames, dt, sin=np.sin):
     """fit_parameters = sinefit(frames)
     Takes the output of parse_csv and runs a sine-fitting function against it.
     For frames with n dots, returns an n-element list of tuples of SineFit objects (x,y).
@@ -228,7 +228,8 @@ def calculate_peak_strain(fit_parameters, resting_x, resting_y, extended_x, exte
     return (strain_x, strain_y)
 
 
-def write_plots(frames, fit_parameters, jitter, directory, min_strain=-0.1, max_strain=0.3, dt=1/30.0):
+def write_plots(frames, fit_parameters, jitter, directory, peak_strain, dt,
+                min_strain=-0.1, max_strain=0.3):
     # draw residual plots for each sine fit in x and y
     t = np.arange(len(frames)) * dt
     fit = lambda t, sf: sf.eval(t)
@@ -278,7 +279,6 @@ def write_plots(frames, fit_parameters, jitter, directory, min_strain=-0.1, max_
     plt.savefig('%s/center_position_post.png' % directory)
 
     n = int(sqrt(len(fit_parameters)))
-    peak_strain = calculate_peak_strain(fit_parameters, resting_x, resting_y, extended_x, extended_y)
     min_strain = min_strain or min(peak_strain[0] + peak_strain[1])
     max_strain = max_strain or max(peak_strain[0] + peak_strain[1])
     matrix = lambda axis: np.array(peak_strain[axis]).reshape(n, n)
@@ -342,6 +342,9 @@ def main():
     centered_frames, jitter = recenter(frames)
     fit_parameters = sinefit(frames, sin=sin_functions[args.fit_function])
     write_plots(frames, fit_parameters, jitter, directory=args.outpath, min_strain=-0.05, max_strain=0.25)
+    fit_parameters = sinefit(frames, dt=1./args.fps, sin=sin_functions[args.fit_function])
+    write_plots(frames, fit_parameters, jitter, peak_strain, directory=args.outpath,
+                dt=1./args.fps, min_strain=-0.05, max_strain=0.25)
 
 
 if __name__ == '__main__':
