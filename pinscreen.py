@@ -9,7 +9,7 @@ import scipy as sp
 import matplotlib as mpl
 if __name__ == "__main__": mpl.use('Agg')  # we need to do this right away
 import numpy as np
-from numpy import pi, floor, copysign, sqrt
+from numpy import pi, floor, copysign, sqrt, mean
 import matplotlib.pyplot as plt
 from scipy import optimize, stats
 from scipy.signal import sawtooth
@@ -166,6 +166,42 @@ def process_coordinates(fit_parameters):
 
     return (center_x, center_y, resting_x, resting_y, extended_x, extended_y)
 
+
+def process_coordinates_from_data(fit_parameters, frames, dt):
+    """(center_x, center_y, resting_x, resting_y, extended_x, extended_y)
+    finds the resting and extended position for each dot, using the data."""
+    X, Y = 0, 1
+    center_x = ((fit_parameters[-1][0].offset - fit_parameters[-1][0].amplitude) -
+                (fit_parameters[0][0].offset + fit_parameters[0][0].amplitude)) / 2 + fit_parameters[0][0].offset
+    center_y = ((fit_parameters[-1][1].offset - fit_parameters[-1][1].amplitude) -
+                (fit_parameters[0][1].offset + fit_parameters[0][1].amplitude)) + fit_parameters[0][1].offset
+
+    # resting y positions fall when y is maximized, at t = period (pi/2 - phase) / (2 pi)
+    # (this is because of our choice of coordinate system, where extension is up, towards 0)
+    N = len(frames)
+    y_max_t = [np.arange(start=yfit.period * (pi/2-yfit.phase) / (2*pi),
+                         stop=N*dt,
+                         step=yfit.period) for _, yfit in fit_parameters]
+    y_max_t = [a[a > 0] for a in y_max_t]
+
+    # extended y positions fall when y is minimized, at t = period (3 pi / 2 - phase) / (2 pi)
+    y_min_t = [np.arange(start=yfit.period * (3*pi/2-yfit.phase) / (2*pi),
+                         stop=N*dt,
+                         step=yfit.period) for _, yfit in fit_parameters]
+    y_min_t = [a[a > 0] for a in y_min_t]
+
+    y_max_i = [np.rint(yt / dt).astype(int) for yt in y_max_t]
+    y_min_i = [np.rint(yt / dt).astype(int) for yt in y_min_t]
+
+    resting_x, resting_y = [], []
+    extended_x, extended_y = [], []
+    n_dots = len(frames[0])
+    for dot in range(n_dots):
+        extended_x.append(mean([frames[i][dot].xpos for i in y_min_i[dot]]))
+        extended_y.append(mean([frames[i][dot].ypos for i in y_min_i[dot]]))
+        resting_x.append(mean([frames[i][dot].xpos for i in y_max_i[dot]]))
+        resting_y.append(mean([frames[i][dot].ypos for i in y_max_i[dot]]))
+    return (center_x, center_y, resting_x, resting_y, extended_x, extended_y)
 
 def find_center_by_frame(frames):
     return [(np.mean([dot.xpos for dot in frame]),
@@ -330,6 +366,13 @@ def main():
     parser.add_argument('--fit-function', '-f',
                         help='Choose a function to fit the waveforms',
                         choices=sin_functions.keys(), default='sine')
+    parser.add_argument(
+        '--strains-from', '-s',
+        choices=['fit', 'data'], default='fit',
+        help=("Choose whether strains will be computed from the peaks of the "
+              "fit function (fit; default) or from the average of the observed "
+              "strains at the extended position determined from the fits (data)."))
+    parser.add_argument('--fps', type=float, default=30.)
     args = parser.parse_args()
     try:
         os.makedirs(args.outpath)  # do this first so we aren't surprised later
@@ -341,10 +384,17 @@ def main():
     frames = parse_mtrack2(f)
     f.close()
     centered_frames, jitter = recenter(frames)
-    fit_parameters = sinefit(frames, sin=sin_functions[args.fit_function])
-    write_plots(frames, fit_parameters, jitter, directory=args.outpath, min_strain=-0.05, max_strain=0.25)
     fit_parameters = sinefit(frames, dt=1./args.fps, sin=sin_functions[args.fit_function])
-    write_plots(frames, fit_parameters, jitter, peak_strain, directory=args.outpath,
+    if args.strains_from == 'fit':
+        (_center_x, _center_y, resting_x, resting_y, extended_x, extended_y) = \
+                process_coordinates(fit_parameters)
+    elif args.strains_from == 'data':
+        (_center_x, _center_y, resting_x, resting_y, extended_x, extended_y) = \
+                process_coordinates_from_data(fit_parameters, frames, 1./args.fps)
+    else:
+        raise ValueError
+    peak_strain = calculate_peak_strain(fit_parameters, resting_x, resting_y, extended_x, extended_y)
+    write_plots(frames, fit_parameters, jitter, args.outpath, peak_strain,
                 dt=1./args.fps, min_strain=-0.05, max_strain=0.25)
 
 
