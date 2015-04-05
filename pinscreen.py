@@ -317,6 +317,11 @@ def write_plots(frames, fit_parameters, jitter, directory, peak_strain, dt,
 
 
 def main():
+    sin_functions = {
+        'sine': np.sin,
+        'sawtooth': lambda x: sawtooth(x, width=0.5),
+    }
+
     parser = argparse.ArgumentParser()
     parser.add_argument('infile')
     parser.add_argument('outpath')
@@ -324,7 +329,7 @@ def main():
                         help="Don't complain if outpath already exists")
     parser.add_argument('--fit-function', '-f',
                         help='Choose a function to fit the waveforms',
-                        choices=['sine', 'sawtooth'], default='sine')
+                        choices=sin_functions.keys(), default='sine')
     args = parser.parse_args()
     try:
         os.makedirs(args.outpath)  # do this first so we aren't surprised later
@@ -332,10 +337,6 @@ def main():
         if not args.overwrite:
             print >> sys.stderr, "Output path exists. Use --overwrite to run anyway."
             sys.exit(1)
-    sin_functions = {
-        'sine': np.sin,
-        'sawtooth': lambda x: sawtooth(x, width=0.5),
-    }
     f = open(args.infile, 'rU')
     frames = parse_mtrack2(f)
     f.close()
