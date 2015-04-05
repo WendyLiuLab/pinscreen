@@ -31,12 +31,13 @@ class Dot:
 
 class SineFit:
     "Stores parameters for an arbitrary sine function."
-    def __init__(self, amplitude, period, phase, offset, r2=None):
+    def __init__(self, amplitude, period, phase, offset, r2=None, sin=np.sin):
         self.amplitude = amplitude
         self.period = period
         self.phase = phase
         self.offset = offset
         self.r2 = r2
+        self.sin = sin
         self.normalize()
 
     def normalize(self):
@@ -53,7 +54,7 @@ class SineFit:
         singleton = not getattr(t, '__iter__', False)
         if singleton:
             t = [t]
-        ret = [self.amplitude * sawtooth(2*pi/self.period * ti + self.phase, width=0.5) + self.offset for ti in t]
+        ret = [self.amplitude * self.sin(2*pi/self.period * ti + self.phase) + self.offset for ti in t]
         return ret[0] if singleton else ret
 
     def __repr__(self):
@@ -107,7 +108,7 @@ def parse_mtrack2(fileobj):
     return frames
 
 
-def sinefit(frames, dt=1.0/30.0):
+def sinefit(frames, dt=1.0/30.0, sin=np.sin):
     """fit_parameters = sinefit(frames)
     Takes the output of parse_csv and runs a sine-fitting function against it.
     For frames with n dots, returns an n-element list of tuples of SineFit objects (x,y).
@@ -115,7 +116,7 @@ def sinefit(frames, dt=1.0/30.0):
     """
 
     # p = [amplitude, period, phase offset, y offset]
-    fitfunc = lambda p, x: p[0] * sawtooth(2*pi/p[1]*x + p[2], width=0.5) + p[3]
+    fitfunc = lambda p, x: p[0] * sin(2*pi/p[1]*x + p[2]) + p[3]
     errfunc = lambda p, x, y: fitfunc(p, x) - y
     p0 = [1., 1., 0., 0.]
     t = np.arange(len(frames)) * dt
@@ -130,14 +131,14 @@ def sinefit(frames, dt=1.0/30.0):
         px, success = optimize.leastsq(errfunc, p0, args=(t, dx))
         if not success:
             raise "Problem with optimize for dot %d in x" % idot
-        xfit = SineFit(*px)
+        xfit = SineFit(*px, sin=sin)
         xfit.r2 = stats.mstats.pearsonr(dx, xfit.eval(t))[0] ** 2
         p0[0] = (max(dy)-min(dy))/2.0
         p0[3] = np.mean(dy)
         py, success = optimize.leastsq(errfunc, p0, args=(t, dy))
         if not success:
             raise "Problem with optimize for dot %d in y" % idot
-        yfit = SineFit(*py)
+        yfit = SineFit(*py, sin=sin)
         yfit.r2 = stats.mstats.pearsonr(dy, yfit.eval(t))[0] ** 2
         fit_parameters.append((xfit, yfit))
 
@@ -319,7 +320,11 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('infile')
     parser.add_argument('outpath')
-    parser.add_argument('--overwrite', '-O', action='store_true')
+    parser.add_argument('--overwrite', '-O', action='store_true',
+                        help="Don't complain if outpath already exists")
+    parser.add_argument('--fit-function', '-f',
+                        help='Choose a function to fit the waveforms',
+                        choices=['sine', 'sawtooth'], default='sine')
     args = parser.parse_args()
     try:
         os.makedirs(args.outpath)  # do this first so we aren't surprised later
@@ -327,11 +332,15 @@ def main():
         if not args.overwrite:
             print >> sys.stderr, "Output path exists. Use --overwrite to run anyway."
             sys.exit(1)
+    sin_functions = {
+        'sine': np.sin,
+        'sawtooth': lambda x: sawtooth(x, width=0.5),
+    }
     f = open(args.infile, 'rU')
     frames = parse_mtrack2(f)
     f.close()
     centered_frames, jitter = recenter(frames)
-    fit_parameters = sinefit(frames)
+    fit_parameters = sinefit(frames, sin=sin_functions[args.fit_function])
     write_plots(frames, fit_parameters, jitter, directory=args.outpath, min_strain=-0.05, max_strain=0.25)
 
 
