@@ -355,7 +355,7 @@ def write_plots(frames, fit_parameters, jitter, directory, peak_strain, dt,
 def main():
     sin_functions = {
         'sine': np.sin,
-        'sawtooth': lambda x: sawtooth(x, width=0.5),
+        'sawtooth': lambda x: sawtooth(x-3*pi/2, width=0.5),
     }
 
     parser = argparse.ArgumentParser()
